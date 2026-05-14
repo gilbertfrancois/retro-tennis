@@ -1,0 +1,76 @@
+---
+# Deploys the retro-tennis WASM site as a container that joins the shared
+# blitzblit-net network. blitzblit-master must already be deployed (it
+# installs docker and creates the network); this playbook is intentionally
+# minimal — it just stages files and starts the container.
+
+- name: Deploy retro-tennis
+  hosts: all
+  become: true
+  gather_facts: false
+
+  vars:
+    repo_root: "{{ playbook_dir }}/.."
+
+  tasks:
+    # Pre-flight: blitzblit-master must have set things up first.
+    - name: Verify shared docker network exists
+      ansible.builtin.shell: docker network inspect {{ shared_network }}
+      register: net_check
+      changed_when: false
+      failed_when: net_check.rc != 0
+
+    - name: Create site directory
+      ansible.builtin.file:
+        path: "{{ site_root }}"
+        state: directory
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+
+    - name: Copy docker-compose.yml
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/docker-compose.yml"
+        dest: "{{ site_root }}/docker-compose.yml"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0644"
+
+    - name: Copy lifecycle scripts
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/{{ item }}"
+        dest: "{{ site_root }}/{{ item }}"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0755"
+      loop:
+        - start.sh
+        - stop.sh
+
+    - name: Render env file
+      ansible.builtin.template:
+        src: env.j2
+        dest: "{{ site_root }}/env"
+        owner: "{{ ansible_user }}"
+        group: "{{ ansible_user }}"
+        mode: "0640"
+
+    - name: Pull and (re)start the retro-tennis stack
+      ansible.builtin.command:
+        cmd: docker compose up --pull always -d
+        chdir: "{{ site_root }}"
+      when: auto_up | default(true)
+      changed_when: true
+
+    - name: Post-deploy reminder
+      ansible.builtin.debug:
+        msg: |
+          Stack pulled and (re)started at {{ site_root }}.
+
+          Master nginx (in blitzblit-master) routes
+          https://pong.blitzblit.com →
+          http://retro-tennis-frontend:80 on the {{ shared_network }} network
+          automatically.
+
+          Pass `-e auto_up=false` to ansible-playbook to skip the pull/up
+          step (e.g. for a config-only refresh).

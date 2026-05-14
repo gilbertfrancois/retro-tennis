@@ -1,0 +1,8 @@
+---
+# Site root on the server. The folder name matches the public hostname.
+site_root: "/home/{{ ansible_user }}/sites/pong.blitzblit.com"
+
+# Shared docker network created by blitzblit-master. This playbook does not
+# create it — if missing the play will fail loudly so you know master needs
+# to run first.
+shared_network: blitzblit-net

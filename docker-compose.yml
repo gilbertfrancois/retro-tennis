@@ -1,0 +1,28 @@
+# Compose project name. Produces container names like
+#   retro-tennis-frontend-1
+# (matches the [site]-[component]-N pattern of blitzblit-master).
+name: retro-tennis
+
+x-logging-default: &logging-default
+  driver: "json-file"
+  options:
+    max-size: "100m"
+    max-file: "3"
+
+services:
+  frontend:
+    image: gilbertfrancois/retro-tennis:latest
+    # No `ports:` block — master nginx in blitzblit-master reaches this
+    # container at http://retro-tennis-frontend:80 over the shared
+    # blitzblit-net network.
+    networks:
+      blitzblit-net:
+        aliases:
+          - retro-tennis-frontend
+    restart: unless-stopped
+    logging: *logging-default
+
+networks:
+  blitzblit-net:
+    external: true
+    name: blitzblit-net
